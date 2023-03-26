@@ -1,26 +1,24 @@
 package com.tebreca.digtafel;
 
 import com.google.gson.Gson;
-import me.friwi.jcefmaven.CefAppBuilder;
-import me.friwi.jcefmaven.CefInitializationException;
-import me.friwi.jcefmaven.UnsupportedPlatformException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringApplication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
+@EnableScheduling
 @AutoConfiguration
 @SpringBootApplication
 public class DigtafelApplication {
@@ -29,6 +27,7 @@ public class DigtafelApplication {
     private static String domain;
     private static int preferredId;
     private final Gson gson = new Gson();
+    private static final Logger logger = LoggerFactory.getLogger(DigtafelApplication.class);
 
     @Bean
     static BrowserManager manager() {
@@ -50,19 +49,22 @@ public class DigtafelApplication {
         ConfigurableApplicationContext context = builder.run(args);
     }
 
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedRate = 3000)
     public static void setup() throws InterruptedException {
+        logger.info("Starting search!");
         if (server != null)
             return;
         String ip = "";
         boolean connected = false;
         for (int i = 0; i <= 255; i++) {
-            ip = domain + i + "/";
-            try (Socket socket = new Socket()) {
-                socket.connect(new InetSocketAddress(ip, 8080));
+            ip = domain + i;
+            try (Socket socket = new Socket(ip, 8080)) {
                 connected = true;
+                logger.info("Found at " + ip);
+                socket.close();
                 break;
             } catch (Exception ignored) {
+
             }
         }
         if (connected) {
@@ -74,6 +76,7 @@ public class DigtafelApplication {
     private static void connect() {
         WebClient client = WebClient.create();
         WebClient.ResponseSpec response = client.get().uri(server + "/ready?id=" + preferredId).retrieve();//TODO
+        response.onStatus(httpStatusCode -> httpStatusCode.isError(), (clientResponse, var)  -> System.exit(-1));
     }
 
 
@@ -93,8 +96,9 @@ public class DigtafelApplication {
                 gson.toJson(new Config(), fileWriter);
             }
         }
-
-
+        //hotfix
+        server = domain;
+        connect();
         browserManager.setup();
 
 
