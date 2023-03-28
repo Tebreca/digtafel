@@ -8,9 +8,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.io.FileReader;
@@ -74,9 +77,9 @@ public class DigtafelApplication {
     }
 
     private static void connect() {
-        WebClient client = WebClient.create();
-        WebClient.ResponseSpec response = client.get().uri(server + "/ready?id=" + preferredId).retrieve();//TODO
-        response.onStatus(httpStatusCode -> httpStatusCode.isError(), (clientResponse, var)  -> System.exit(-1));
+        RestTemplate template = new RestTemplate();
+        String response = template.getForObject(domain + "/ready?id=" + preferredId, String.class);
+        logger.info(response);
     }
 
 
@@ -89,10 +92,10 @@ public class DigtafelApplication {
                 preferredId = config1.getId();
             }
         } else {
-            if (!config.createNewFile()){
-                 System.exit(-1);
+            if (!config.createNewFile()) {
+                System.exit(-1);
             }
-            try(FileWriter fileWriter = new FileWriter(config)){
+            try (FileWriter fileWriter = new FileWriter(config)) {
                 gson.toJson(new Config(), fileWriter);
             }
         }
